@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="56" y1="70" x2="210" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3BB3F2"/>
+      <stop offset="1" stop-color="#1E7CC9"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="302" y1="70" x2="456" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#59D8CB"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="85" y1="250" x2="427" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#243A9A"/>
+      <stop offset="1" stop-color="#0E7A7E"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M58 190C58 122 112 70 180 70C248 70 302 122 302 190V205H58V190Z" fill="url(#g1)"/>
+  <path d="M210 190C210 122 264 70 332 70C400 70 454 122 454 190V205H210V190Z" fill="url(#g2)"/>
+
+  <path d="M55 280C120 190 392 190 457 280C387 242 125 242 55 280Z" fill="#091B64"/>
+  <path d="M85 304C143 223 369 223 427 304C365 268 147 268 85 304Z" fill="url(#g3)"/>
+  <path d="M145 306C184 252 328 252 367 306C325 284 187 284 145 306Z" fill="#15337A"/>
+
+  <text x="46" y="430" fill="#1E7CC9" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700">Bridge</text>
+  <text x="274" y="430" fill="#14B8A6" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700">Voice</text>
+  <text x="59" y="482" fill="#1F2937" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="500">Connecting Communication</text>
+</svg>
