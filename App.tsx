@@ -116,12 +116,7 @@ export default function App() {
       const fileResponse = await fetch(uri);
       const fileBlob = await fileResponse.blob();
       const form = new FormData();
-      form.append('audio_chunk', {
-        // @ts-expect-error React Native file object format for FormData.
-        uri,
-        name: 'mobile-recording.m4a',
-        type: fileBlob.type || 'audio/m4a'
-      });
+      form.append('audio_chunk', fileBlob, 'mobile-recording.m4a');
       form.append('language', 'en');
 
       const response = await fetch(`${API_BASE_URL}/process-audio`, {
