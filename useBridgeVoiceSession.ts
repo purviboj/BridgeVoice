@@ -29,7 +29,7 @@ export function useBridgeVoiceSession(sessionId: string) {
     );
 
     socketRef.current = socket;
-    return () => socket.close();
+    return () => socket?.close();
   }, [sessionId]);
 
   const sendText = useCallback(

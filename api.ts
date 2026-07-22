@@ -17,15 +17,9 @@ export function getApiBaseUrl(): string {
   return `${window.location.protocol}//${host}:8000`;
 }
 
-export function getSessionWsUrl(sessionId: string): string {
+export function getSessionWsUrl(_sessionId: string): string | null {
   const envWs = process.env.NEXT_PUBLIC_WS_URL?.trim();
-  if (envWs) return envWs.replace('local-demo', sessionId);
+  if (envWs) return envWs.replace('local-demo', _sessionId);
 
-  const host = browserHost();
-  if (!host || LOCAL_HOSTS.has(host)) {
-    return `ws://127.0.0.1:8000/ws/session/${sessionId}`;
-  }
-
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProtocol}//${host}:8000/ws/session/${sessionId}`;
+  return null;
 }

@@ -6,8 +6,9 @@ export function createSessionSocket(
   onMessage: (msg: SessionMessage) => void,
   onOpen?: () => void,
   onClose?: () => void
-): WebSocket {
+): WebSocket | null {
   const url = getSessionWsUrl(sessionId);
+  if (!url) return null;
 
   const socket = new WebSocket(url);
 

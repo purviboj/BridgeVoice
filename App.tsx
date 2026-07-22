@@ -23,7 +23,7 @@ type SessionMessage = {
 };
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL ?? 'ws://127.0.0.1:8000/ws/session/mobile-demo';
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL?.trim() ?? '';
 const VOICE_ID = process.env.EXPO_PUBLIC_ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
 
 export default function App() {
@@ -41,6 +41,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
 
   useEffect(() => {
+    if (!WS_URL) return;
     const socket = new WebSocket(WS_URL);
     socketRef.current = socket;
 
