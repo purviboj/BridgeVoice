@@ -21,5 +21,9 @@ export function getSessionWsUrl(_sessionId: string): string | null {
   const envWs = process.env.NEXT_PUBLIC_WS_URL?.trim();
   if (envWs) return envWs.replace('local-demo', _sessionId);
 
-  return null;
+  const host = browserHost();
+  if (!host) return null;
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${host}/api/ws/session/${_sessionId}`;
 }
