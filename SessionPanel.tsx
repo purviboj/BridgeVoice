@@ -6,7 +6,9 @@ import { useBridgeVoiceSession } from '@/hooks/useBridgeVoiceSession';
 
 export default function SessionPanel({ sessionId }: { sessionId: string }) {
   const { connected, messages, sendText, clearMessages } = useBridgeVoiceSession(sessionId);
-  const speechRecognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const translationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [translatedSpeech, setTranslatedSpeech] = useState('');
   const [simpleExplanationOriginal, setSimpleExplanationOriginal] = useState('');
@@ -15,8 +17,6 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
   const [isGeneratingExplanation, setIsGeneratingExplanation] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [liveSpeechDraft, setLiveSpeechDraft] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Spanish' | 'French' | 'Hindi'>('Spanish');
   const [translationError, setTranslationError] = useState('');
   const [explanationError, setExplanationError] = useState('');
@@ -28,48 +28,19 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
     () => messages.filter((m) => m.type === 'transcript').map((m) => m.payload).join(' '),
     [messages]
   );
-  const liveEnglishTranscript = useMemo(
-    () => `${englishTranscript}${liveSpeechDraft ? ` ${liveSpeechDraft}` : ''}`.trim(),
-    [englishTranscript, liveSpeechDraft]
-  );
+  const liveEnglishTranscript = englishTranscript;
+
+  const canRecordAudio =
+    typeof window !== 'undefined' &&
+    Boolean(navigator.mediaDevices?.getUserMedia) &&
+    typeof MediaRecorder !== 'undefined';
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognitionCtor) {
-      setSpeechSupported(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onresult = (event: any) => {
-      let interimText = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const spokenText = event.results?.[i]?.[0]?.transcript?.trim();
-        if (!spokenText) continue;
-        if (event.results[i].isFinal) {
-          sendText(spokenText, selectedLanguage);
-        } else {
-          interimText = `${interimText} ${spokenText}`.trim();
-        }
-      }
-      setLiveSpeechDraft(interimText);
+    return () => {
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
-    recognition.onend = () => {
-      setIsListening(false);
-      setLiveSpeechDraft('');
-    };
-    recognition.onerror = () => {
-      setIsListening(false);
-      setLiveSpeechDraft('');
-    };
-    speechRecognitionRef.current = recognition;
-  }, [sendText, selectedLanguage]);
+  }, []);
 
   const handleTranslate = async () => {
     if (!liveEnglishTranscript.trim()) return;
@@ -145,12 +116,12 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
     setExplanationError('');
     try {
       const [originalRes, translatedRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/generate-visit-summary`, {
+        fetch(`${apiBaseUrl}/generate-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ transcript: englishTranscript, target_language: 'English' })
         }),
-        fetch(`${apiBaseUrl}/generate-visit-summary`, {
+        fetch(`${apiBaseUrl}/generate-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ transcript: englishTranscript, target_language: selectedLanguage })
@@ -209,23 +180,90 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
   };
 
   const handleToggleSpeak = () => {
-    const recognition = speechRecognitionRef.current;
-    if (!recognition) return;
     if (isListening) {
-      recognition.stop();
+      mediaRecorderRef.current?.stop();
       setIsListening(false);
       return;
     }
-    setIsListening(true);
-    recognition.start();
+
+    if (!canRecordAudio) {
+      setAudioError('Audio recording is not supported in this browser.');
+      return;
+    }
+
+    setAudioError('');
+    void (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+        audioChunksRef.current = [];
+
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        recorder.onstop = async () => {
+          setIsListening(false);
+          const chunks = audioChunksRef.current;
+          audioChunksRef.current = [];
+          mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+          mediaStreamRef.current = null;
+
+          const audioBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          if (!audioBlob.size) {
+            setAudioError('No audio captured. Please try again.');
+            return;
+          }
+
+          try {
+            const formData = new FormData();
+            formData.append('audio_chunk', audioBlob, 'bridgevoice-recording.webm');
+            formData.append('language', 'en');
+
+            const response = await fetch(`${apiBaseUrl}/process-audio`, {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!response.ok) {
+              const errorBody = (await response.json().catch(() => ({}))) as { error?: string };
+              throw new Error(errorBody.error || 'Failed to transcribe audio.');
+            }
+
+            const data = (await response.json()) as { transcript?: string };
+            const transcript = data.transcript?.trim() ?? '';
+            if (!transcript) {
+              throw new Error('No transcript returned from speech service.');
+            }
+
+            sendText(transcript, selectedLanguage);
+          } catch (err: any) {
+            setAudioError(err?.message || 'Unable to process recorded audio.');
+          }
+        };
+
+        recorder.start();
+        setIsListening(true);
+      } catch (err: any) {
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        setAudioError(err?.message || 'Could not access the microphone.');
+        setIsListening(false);
+      }
+    })();
   };
 
   const handleResetTranscript = () => {
-    if (isListening && speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
+    if (isListening) {
+      mediaRecorderRef.current?.stop();
     }
     clearMessages();
-    setLiveSpeechDraft('');
+    audioChunksRef.current = [];
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
     setTranslatedSpeech('');
     setSimpleExplanationOriginal('');
     setSimpleExplanationTranslated('');
@@ -252,7 +290,7 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
       <section className="rounded-2xl bg-slate-900 p-6 text-white shadow-sm">
         <h2 className="text-lg font-medium uppercase tracking-wide text-slate-300">Doctor Speech</h2>
         <p className="mt-3 text-3xl font-semibold leading-tight md:text-5xl">
-          {liveEnglishTranscript || 'English transcript'}
+          {isListening ? 'Listening...' : liveEnglishTranscript || 'English transcript'}
         </p>
       </section>
 
@@ -264,9 +302,8 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
               <button
                 className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={handleToggleSpeak}
-                disabled={!speechSupported}
               >
-                {isListening ? 'Stop Speaking' : 'Tap to Speak'}
+                {isListening ? 'Stop Recording' : 'Tap to Speak'}
               </button>
               <button
                 className="rounded-md border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
@@ -355,31 +392,6 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
         >
           {isGeneratingExplanation ? 'Generating...' : 'Generate Explanation'}
         </button>
-      </section>
-
-      <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <h3 className="text-lg font-medium">Speak or Test Input</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Click the button and speak. Your speech is converted to text and pushed into the live feed.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          <button
-            className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900"
-            onClick={() =>
-              sendText(
-                'Your hemoglobin levels are low due to iron deficiency anemia.',
-                selectedLanguage
-              )
-            }
-          >
-            Send Sample Doctor Speech
-          </button>
-        </div>
-        {!speechSupported ? (
-          <p className="mt-2 text-xs text-rose-600">
-            Speech recognition is not supported in this browser. Try Chrome on desktop.
-          </p>
-        ) : null}
       </section>
     </main>
   );

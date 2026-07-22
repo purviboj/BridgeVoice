@@ -14,7 +14,7 @@ export function getApiBaseUrl(): string {
     return 'http://127.0.0.1:8000';
   }
 
-  return `${window.location.protocol}//${host}:8000`;
+  return 'https://backend-bridge-voice.vercel.app';
 }
 
 export function getSessionWsUrl(_sessionId: string): string | null {
