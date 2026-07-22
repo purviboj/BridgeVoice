@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { getApiBaseUrl } from '@/lib/api';
 import { useBridgeVoiceSession } from '@/hooks/useBridgeVoiceSession';
 
 export default function SessionPanel({ sessionId }: { sessionId: string }) {
@@ -21,6 +22,7 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
   const [explanationError, setExplanationError] = useState('');
   const [audioError, setAudioError] = useState('');
   const defaultVoiceId = process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
+  const apiBaseUrl = getApiBaseUrl();
 
   const englishTranscript = useMemo(
     () => messages.filter((m) => m.type === 'transcript').map((m) => m.payload).join(' '),
@@ -79,7 +81,7 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
     setIsTranslating(true);
     setTranslationError('');
     try {
-      const response = await fetch('/api/translate', {
+      const response = await fetch(`${apiBaseUrl}/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -143,12 +145,12 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
     setExplanationError('');
     try {
       const [originalRes, translatedRes] = await Promise.all([
-        fetch('/api/generate-visit-summary', {
+        fetch(`${apiBaseUrl}/generate-visit-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ transcript: englishTranscript, target_language: 'English' })
         }),
-        fetch('/api/generate-visit-summary', {
+        fetch(`${apiBaseUrl}/generate-visit-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ transcript: englishTranscript, target_language: selectedLanguage })
@@ -180,7 +182,7 @@ export default function SessionPanel({ sessionId }: { sessionId: string }) {
     setIsPlaying(true);
     setAudioError('');
     try {
-      const response = await fetch('/api/text-to-speech', {
+      const response = await fetch(`${apiBaseUrl}/text-to-speech`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

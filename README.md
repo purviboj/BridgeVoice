@@ -156,11 +156,36 @@ http://localhost:3000
 ### 3) Start Backend Server
 
 ```bash
-cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python3 app.py
 ```
 
-Using `--host 0.0.0.0` allows devices on the same network to connect to the backend.
+The backend binds to `0.0.0.0` in `app.py`, so devices on the same network can reach it.
+
+---
+
+## Deploying
+
+BridgeVoice is split into two deployable parts:
+
+- **Frontend:** deploy this repo to Vercel as a Next.js app.
+- **Backend:** deploy `app.py` separately on Render, Fly.io, Railway, or another Python host.
+
+Set these environment variables in Vercel:
+
+- `NEXT_PUBLIC_API_BASE_URL` → your public backend URL, such as `https://api.yourdomain.com`
+- `NEXT_PUBLIC_WS_URL` → your public websocket URL, such as `wss://api.yourdomain.com/ws/session/mobile-demo`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+Set these environment variables on the backend host:
+
+- `OPENAI_API_KEY`
+- `ELEVENLABS_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `FRONTEND_ORIGINS` → your Vercel domain
+
+Do not route Vercel to `main.py`; that file is not the frontend entrypoint.
 
 ---
 
